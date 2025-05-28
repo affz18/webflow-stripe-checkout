@@ -57,8 +57,8 @@ exports.handler = async (event, context) => {
       payment_method_types: ['card', 'twint'], // Twint aktiviert!
       line_items: lineItems,
       mode: 'payment',
-      success_url: `${event.headers.origin}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${event.headers.origin}/cancel`,
+      success_url: `${event.headers.origin}/order-confirmation?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${event.headers.origin}/checkout`,
       shipping_address_collection: {
         allowed_countries: ['CH', 'DE', 'AT'], // Deine Lieferländer
       },
