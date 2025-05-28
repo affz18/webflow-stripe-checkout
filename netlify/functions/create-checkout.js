@@ -52,25 +52,17 @@ exports.handler = async (event, context) => {
       quantity: item.quantity,
     }));
 
-    // Stripe Checkout Session erstellen
+    // Stripe Checkout Session erstellen - TWINT FOKUS
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'], // Erstmal nur Karten
+      payment_method_types: ['card', 'twint'], // Karten + Twint
       line_items: lineItems,
       mode: 'payment',
       success_url: `${event.headers.origin}/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${event.headers.origin}/checkout`,
       shipping_address_collection: {
-        allowed_countries: ['CH', 'DE', 'AT'], // Deine Lieferländer
+        allowed_countries: ['CH', 'DE', 'AT'],
       },
       billing_address_collection: 'required',
-      // Apple Pay und Google Pay werden automatisch angezeigt wenn verfügbar
-      automatic_payment_methods: {
-        enabled: true, // Das aktiviert Apple Pay, Google Pay automatisch
-      },
-      // Automatische Steuerberechnung (optional)
-      automatic_tax: {
-        enabled: false, // Auf true setzen wenn du Stripe Tax nutzt
-      },
     });
 
     return {
