@@ -1,10 +1,27 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 exports.handler = async (event, context) => {
+  // CORS Headers für alle Requests
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  };
+
+  // OPTIONS Request für CORS Preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ message: 'CORS Preflight successful' })
+    };
+  }
+
   // Nur POST Requests erlauben
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
+      headers,
       body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
@@ -17,6 +34,7 @@ exports.handler = async (event, context) => {
     if (!items || !Array.isArray(items) || items.length === 0) {
       return {
         statusCode: 400,
+        headers,
         body: JSON.stringify({ error: 'Keine Artikel im Warenkorb' })
       };
     }
@@ -53,11 +71,7 @@ exports.handler = async (event, context) => {
 
     return {
       statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST',
-      },
+      headers,
       body: JSON.stringify({
         url: session.url,
         session_id: session.id
@@ -68,6 +82,7 @@ exports.handler = async (event, context) => {
     console.error('Stripe Error:', error);
     return {
       statusCode: 500,
+      headers,
       body: JSON.stringify({ 
         error: 'Fehler beim Erstellen der Checkout-Session',
         details: error.message 
