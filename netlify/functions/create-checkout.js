@@ -46,6 +46,10 @@ exports.handler = async (event, context) => {
         product_data: {
           name: item.name,
           images: item.image ? [item.image] : [],
+          metadata: {
+            product_type: 'webflow_product',
+            source: 'webflow_checkout'
+          }
         },
         unit_amount: Math.round(item.price * 100), // Preis in Rappen (Cent)
       },
@@ -63,6 +67,17 @@ exports.handler = async (event, context) => {
         allowed_countries: ['CH', 'DE', 'AT'],
       },
       billing_address_collection: 'required',
+      // Wichtig: Bestelldetails in Session Metadata speichern
+      metadata: {
+        order_source: 'webflow_custom_checkout',
+        products: JSON.stringify(items.map(item => ({
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity
+        }))),
+        total_items: items.length,
+        customer_email: 'will_be_filled_by_stripe'
+      }
     });
 
     return {
