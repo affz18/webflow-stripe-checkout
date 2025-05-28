@@ -1,92 +1,92 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
-exports.handler = async (event, context) => {
-  // CORS Headers für alle Requests
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  };
-
-  // OPTIONS Request für CORS Preflight
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ message: 'CORS Preflight successful' })
-    };
-  }
-
-  // Nur POST Requests erlauben
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: 'Method not allowed' })
-    };
-  }
-
-  try {
-    // Warenkorb-Daten aus Request Body holen
-    const { items } = JSON.parse(event.body);
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('Success Page geladen');
+  
+  // Prüfe ob eine session_id vorhanden ist (= erfolgreiche Stripe Zahlung)
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionId = urlParams.get('session_id');
+  
+  if (sessionId) {
+    console.log('Erfolgreiche Zahlung erkannt, leere Warenkorb');
+    clearWebflowCart();
     
-    // Validierung
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Keine Artikel im Warenkorb' })
-      };
+    // Optional: Session ID in der UI anzeigen
+    const sessionElement = document.getElementById('session-id');
+    if (sessionElement) {
+      sessionElement.textContent = sessionId;
     }
-
-    // Stripe Line Items formatieren
-    const lineItems = items.map(item => ({
-      price_data: {
-        currency: 'chf',
-        product_data: {
-          name: item.name,
-          images: item.image ? [item.image] : [],
-        },
-        unit_amount: Math.round(item.price * 100), // Preis in Rappen (Cent)
-      },
-      quantity: item.quantity,
-    }));
-
-    // Stripe Checkout Session erstellen
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card', 'twint'], // Twint aktiviert!
-      line_items: lineItems,
-      mode: 'payment',
-      success_url: `${event.headers.origin}/order-confirmation?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${event.headers.origin}/checkout`,
-      shipping_address_collection: {
-        allowed_countries: ['CH', 'DE', 'AT'], // Deine Lieferländer
-      },
-      billing_address_collection: 'required',
-      // Automatische Steuerberechnung (optional)
-      automatic_tax: {
-        enabled: false, // Auf true setzen wenn du Stripe Tax nutzt
-      },
-    });
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        url: session.url,
-        session_id: session.id
-      })
-    };
-
-  } catch (error) {
-    console.error('Stripe Error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ 
-        error: 'Fehler beim Erstellen der Checkout-Session',
-        details: error.message 
-      })
-    };
+  } else {
+    console.log('Keine Session ID gefunden - möglicherweise direkter Zugriff');
   }
-};
+});
+
+function clearWebflowCart() {
+  try {
+    // Webflow Warenkorb aus localStorage löschen
+    localStorage.removeItem('wf-cart-items');
+    localStorage.removeItem('wf-cart');
+    localStorage.removeItem('webflow-cart');
+    
+    // Auch andere mögliche Webflow Cart Keys löschen
+    const allKeys = Object.keys(localStorage);
+    allKeys.forEach(key => {
+      if (key.includes('cart') || key.includes('commerce')) {
+        localStorage.removeItem(key);
+        console.log(`Entfernt: ${key}`);
+      }
+    });
+    
+    // Webflow Commerce API aufrufen falls verfügbar
+    if (window.Webflow && window.Webflow.commerce) {
+      try {
+        // Versuche Webflow's eigene Clear-Funktion
+        if (window.Webflow.commerce.cart && window.Webflow.commerce.cart.clear) {
+          window.Webflow.commerce.cart.clear();
+          console.log('Webflow Commerce Cart geleert');
+        }
+      } catch (e) {
+        console.log('Webflow Commerce API nicht verfügbar');
+      }
+    }
+    
+    // Session Storage auch leeren
+    sessionStorage.clear();
+    
+    // Warenkorb-Anzeige aktualisieren (falls sichtbar)
+    updateCartDisplay();
+    
+    console.log('Warenkorb erfolgreich geleert');
+    
+  } catch (error) {
+    console.error('Fehler beim Leeren des Warenkorbs:', error);
+  }
+}
+
+function updateCartDisplay() {
+  // Aktualisiere Warenkorb-Anzeige im Header
+  const cartCountElements = document.querySelectorAll('[data-wf-cart-quantity], .cart-quantity, .cart-count');
+  cartCountElements.forEach(el => {
+    el.textContent = '0';
+  });
+  
+  // Verstecke Warenkorb-Inhalt
+  const cartElements = document.querySelectorAll('.w-commerce-commercecartcontainerwrapper');
+  cartElements.forEach(el => {
+    el.style.display = 'none';
+  });
+  
+  // Zeige "Warenkorb ist leer" Nachricht
+  const emptyCartElements = document.querySelectorAll('.w-commerce-commercecartemptystate');
+  emptyCartElements.forEach(el => {
+    el.style.display = 'block';
+  });
+}
+
+// Optional: Verhindere zurück-Navigation zur Checkout-Seite
+window.addEventListener('beforeunload', function() {
+  // Entferne Checkout-URL aus der Browser-Historie
+  if (document.referrer && document.referrer.includes('checkout')) {
+    history.replaceState(null, null, window.location.href);
+  }
+});
+</script>
