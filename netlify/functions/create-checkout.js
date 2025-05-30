@@ -85,12 +85,12 @@ exports.handler = async (event, context) => {
 
     console.log('💳 Line Items erstellt:', lineItems.length);
 
-    // Stripe Checkout Session erstellen - Nur Apple Pay testen
+    // Stripe Checkout Session erstellen - TWINT ohne Apple Pay testen
     const session = await stripe.checkout.sessions.create({
       payment_method_types: [
         'card',           // Kreditkarten ✅
         'paypal',         // PayPal ✅ 
-        'apple_pay'       // Apple Pay (Test isoliert)
+        'twint'           // TWINT (Test ohne Apple Pay)
       ],
       line_items: lineItems,
       mode: 'payment',
