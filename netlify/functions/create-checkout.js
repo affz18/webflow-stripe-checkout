@@ -26,11 +26,21 @@ exports.handler = async (event, context) => {
   // WICHTIG: Stripe Key erst hier initialisieren wenn wir den event haben
   const stripe = require('stripe')(getStripeKey(event));
   
-  // CORS Headers
+  // CORS Headers - Spezifisch für Webflow
+  const allowedOrigins = [
+    'https://aesthetikoase.webflow.io',
+    'https://chipper-melomakarona-9da7ab.netlify.app',
+    'http://localhost:3000' // Für lokale Tests
+  ];
+  
+  const origin = event.headers.origin;
+  const isAllowedOrigin = allowedOrigins.includes(origin) || origin?.includes('.webflow.io');
+  
   const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Origin': isAllowedOrigin ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Credentials': 'false'
   };
 
   // OPTIONS Request für CORS Preflight
