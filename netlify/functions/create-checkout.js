@@ -85,32 +85,31 @@ exports.handler = async (event, context) => {
 
     console.log('💳 Line Items erstellt:', lineItems.length);
 
-    // Stripe Checkout Session erstellen
+    // Stripe Checkout Session erstellen - Alle verfügbaren Payment Methods
     const session = await stripe.checkout.sessions.create({
       payment_method_types: [
-        'card',           // Kreditkarten (Visa, Mastercard, etc.)
-        'twint',          // TWINT (Schweiz)
-        'paypal',         // PayPal
-        'apple_pay',      // Apple Pay
-        'google_pay'      // Google Pay
+        'card',           // Kreditkarten (immer verfügbar)
+        'paypal',         // PayPal ✅ aktiv
+        'apple_pay',      // Apple Pay ✅ aktiv  
+        'klarna',         // Klarna ✅ aktiv (Buy now, pay later)
+        'link',           // Stripe Link ✅ aktiv
+        'bancontact',     // Bancontact ✅ aktiv (Belgien)
+        'eps',            // EPS ✅ aktiv (Österreich)
+        'giropay'         // Giropay ✅ aktiv (Deutschland)
       ],
       line_items: lineItems,
       mode: 'payment',
       success_url: `${origin}/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/checkout`,
       shipping_address_collection: {
-        allowed_countries: ['CH', 'DE', 'AT', 'FR', 'IT'], // Erweitert für PayPal
+        allowed_countries: ['CH', 'DE', 'AT', 'BE', 'FR'], // Erweitert für neue Payment Methods
       },
       billing_address_collection: 'required',
-      // Automatische Steuern (falls aktiviert)
-      automatic_tax: {
-        enabled: false // Setze auf true falls du Stripe Tax verwendest
-      },
       metadata: {
         order_source: 'webflow_custom',
         environment: isTest ? 'test' : 'production',
         total_items: items.length.toString(),
-        payment_methods: 'card,twint,paypal,apple_pay,google_pay'
+        available_payments: 'card,paypal,apple_pay,klarna,link,bancontact,eps,giropay'
       }
     });
 
