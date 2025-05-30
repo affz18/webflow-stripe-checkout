@@ -85,13 +85,12 @@ exports.handler = async (event, context) => {
 
     console.log('💳 Line Items erstellt:', lineItems.length);
 
-    // Stripe Checkout Session erstellen - Vollständiger Payment-Mix
+    // Stripe Checkout Session erstellen - Nur Apple Pay testen
     const session = await stripe.checkout.sessions.create({
       payment_method_types: [
         'card',           // Kreditkarten ✅
         'paypal',         // PayPal ✅ 
-        'apple_pay',      // Apple Pay (neu)
-        'twint'           // TWINT (neu)
+        'apple_pay'       // Apple Pay (Test isoliert)
       ],
       line_items: lineItems,
       mode: 'payment',
@@ -104,8 +103,7 @@ exports.handler = async (event, context) => {
       metadata: {
         order_source: 'webflow_custom',
         environment: isTest ? 'test' : 'production',
-        total_items: items.length.toString(),
-        payment_methods: 'card,paypal,google_pay,apple_pay,twint'
+        total_items: items.length.toString()
       }
     });
 
