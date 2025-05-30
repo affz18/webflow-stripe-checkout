@@ -87,19 +87,30 @@ exports.handler = async (event, context) => {
 
     // Stripe Checkout Session erstellen
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card', 'twint'],
+      payment_method_types: [
+        'card',           // Kreditkarten (Visa, Mastercard, etc.)
+        'twint',          // TWINT (Schweiz)
+        'paypal',         // PayPal
+        'apple_pay',      // Apple Pay
+        'google_pay'      // Google Pay
+      ],
       line_items: lineItems,
       mode: 'payment',
       success_url: `${origin}/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/checkout`,
       shipping_address_collection: {
-        allowed_countries: ['CH', 'DE', 'AT'],
+        allowed_countries: ['CH', 'DE', 'AT', 'FR', 'IT'], // Erweitert für PayPal
       },
       billing_address_collection: 'required',
+      // Automatische Steuern (falls aktiviert)
+      automatic_tax: {
+        enabled: false // Setze auf true falls du Stripe Tax verwendest
+      },
       metadata: {
         order_source: 'webflow_custom',
         environment: isTest ? 'test' : 'production',
-        total_items: items.length.toString()
+        total_items: items.length.toString(),
+        payment_methods: 'card,twint,paypal,apple_pay,google_pay'
       }
     });
 
