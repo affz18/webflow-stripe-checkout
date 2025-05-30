@@ -1,7 +1,27 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require('stripe')(getStripeKey());
+
+function getStripeKey() {
+  // Prüfe ob Request von Webflow Test Domain kommt
+  const origin = process.env.URL || '';
+  const isTestEnvironment = origin.includes('.webflow.io') || 
+                           origin.includes('staging') ||
+                           process.env.CONTEXT === 'deploy-preview';
+  
+  if (isTestEnvironment) {
+    console.log('🧪 Using TEST Stripe Key');
+    return process.env.STRIPE_SECRET_KEY; // Test Key
+  } else {
+    console.log('🟢 Using PRODUCTION Stripe Key');
+    return process.env.STRIPE_Prod; // Live Key
+  }
+}
 
 exports.handler = async (event, context) => {
-  // CORS Headers für alle Requests
+  console.log('Checkout Function aufgerufen');
+  console.log('Environment:', process.env.CONTEXT);
+  console.log('URL:', process.env.URL);
+  
+  // CORS Headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -39,6 +59,8 @@ exports.handler = async (event, context) => {
       };
     }
 
+    console.log('Items erhalten:', items);
+
     // Stripe Line Items formatieren
     const lineItems = items.map(item => ({
       price_data: {
@@ -56,7 +78,7 @@ exports.handler = async (event, context) => {
       quantity: item.quantity,
     }));
 
-    // Stripe Checkout Session erstellen - TWINT FOKUS
+    // Stripe Checkout Session erstellen
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'twint'], // Karten + Twint
       line_items: lineItems,
@@ -70,6 +92,7 @@ exports.handler = async (event, context) => {
       // Wichtig: Bestelldetails in Session Metadata speichern
       metadata: {
         order_source: 'webflow_custom_checkout',
+        environment: process.env.CONTEXT || 'unknown',
         products: JSON.stringify(items.map(item => ({
           name: item.name,
           price: item.price,
@@ -80,12 +103,15 @@ exports.handler = async (event, context) => {
       }
     });
 
+    console.log('Stripe Session erstellt:', session.id);
+
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         url: session.url,
-        session_id: session.id
+        session_id: session.id,
+        environment: process.env.CONTEXT
       })
     };
 
