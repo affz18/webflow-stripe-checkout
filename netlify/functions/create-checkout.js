@@ -85,10 +85,11 @@ exports.handler = async (event, context) => {
 
     console.log('💳 Line Items erstellt:', lineItems.length);
 
-    // Stripe Checkout Session erstellen - Back to Working Version
+    // Stripe Checkout Session erstellen - Schrittweise erweitern
     const session = await stripe.checkout.sessions.create({
       payment_method_types: [
-        'card'            // Nur Kreditkarten erstmal (funktionierte vorher)
+        'card',           // Kreditkarten ✅ funktioniert
+        'paypal'          // PayPal hinzufügen (Test 1)
       ],
       line_items: lineItems,
       mode: 'payment',
