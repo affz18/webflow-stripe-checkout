@@ -1,66 +1,66 @@
-const stripe = require('stripe')(getStripeKey());
-
-function getStripeKey(event) {
-  // Prüfe anhand der Origin welche Keys verwendet werden sollen
-  const origin = event.headers.origin || event.headers.referer || '';
-  const isTestEnvironment = origin.includes('.webflow.io') || 
-                           origin.includes('staging') ||
-                           process.env.CONTEXT === 'deploy-preview';
-  
-  console.log('Origin:', origin);
-  
-  if (isTestEnvironment) {
-    console.log('🧪 Using TEST Stripe Key (from webflow.io)');
-    return process.env.STRIPE_SECRET_KEY; // Test Key
-  } else {
-    console.log('🟢 Using PRODUCTION Stripe Key');
-    return process.env.STRIPE_Prod; // Live Key
-  }
-}
-
 exports.handler = async (event, context) => {
-  console.log('Checkout Function aufgerufen');
-  console.log('Origin:', event.headers.origin);
-  console.log('Referer:', event.headers.referer);
+  console.log('=== Checkout Function Start ===');
   console.log('Method:', event.httpMethod);
+  console.log('Headers:', JSON.stringify(event.headers, null, 2));
   
-  // AGGRESSIVE CORS Headers - Erlaubt ALLES
+  // CORS Headers - Sehr permissiv
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': '*',
     'Access-Control-Allow-Methods': '*',
-    'Access-Control-Max-Age': '86400',
-    'Vary': 'Origin'
+    'Access-Control-Max-Age': '86400'
   };
 
   // OPTIONS Request für CORS Preflight
   if (event.httpMethod === 'OPTIONS') {
-    console.log('CORS Preflight Request');
+    console.log('✅ CORS Preflight Request beantwortet');
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ message: 'CORS Preflight successful' })
+      body: JSON.stringify({ message: 'CORS OK' })
     };
   }
 
-  // Nur POST Requests erlauben
+  // Nur POST erlauben
   if (event.httpMethod !== 'POST') {
+    console.log('❌ Falsche HTTP Method:', event.httpMethod);
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ error: 'Method not allowed' })
+      body: JSON.stringify({ error: 'Nur POST erlaubt' })
     };
   }
 
-  // WICHTIG: Stripe Key erst hier initialisieren wenn wir den event haben
-  const stripe = require('stripe')(getStripeKey(event));
-
   try {
-    // Warenkorb-Daten aus Request Body holen
-    const { items } = JSON.parse(event.body);
+    // Stripe Key auswählen basierend auf Origin
+    const origin = event.headers.origin || event.headers.referer || '';
+    const isTest = origin.includes('.webflow.io');
+    
+    let stripeKey;
+    if (isTest) {
+      stripeKey = process.env.STRIPE_SECRET_KEY; // Test Key
+      console.log('🧪 WEBFLOW TEST MODE - Verwende Test Keys');
+    } else {
+      stripeKey = process.env.STRIPE_Prod; // Live Key
+      console.log('🟢 PRODUCTION MODE - Verwende Live Keys');
+    }
+
+    // Prüfe ob Stripe Key existiert
+    if (!stripeKey) {
+      throw new Error('Stripe Key nicht gefunden in Environment Variables');
+    }
+
+    // Stripe initialisieren
+    const stripe = require('stripe')(stripeKey);
+    console.log('✅ Stripe initialisiert');
+
+    // Request Body parsen
+    const { items } = JSON.parse(event.body || '{}');
+    console.log('📦 Items empfangen:', items);
     
     // Validierung
     if (!items || !Array.isArray(items) || items.length === 0) {
+      console.log('❌ Keine gültigen Items');
       return {
         statusCode: 400,
         headers,
@@ -68,51 +68,42 @@ exports.handler = async (event, context) => {
       };
     }
 
-    console.log('Items erhalten:', items);
-
-    // Stripe Line Items formatieren
+    // Stripe Line Items erstellen
     const lineItems = items.map(item => ({
       price_data: {
         currency: 'chf',
         product_data: {
-          name: item.name,
-          images: item.image ? [item.image] : [],
+          name: item.name || 'Unbekanntes Produkt',
           metadata: {
-            product_type: 'webflow_product',
             source: 'webflow_checkout'
           }
         },
-        unit_amount: Math.round(item.price * 100), // Preis in Rappen (Cent)
+        unit_amount: Math.round((item.price || 0) * 100), // In Rappen
       },
-      quantity: item.quantity,
+      quantity: item.quantity || 1,
     }));
+
+    console.log('💳 Line Items erstellt:', lineItems.length);
 
     // Stripe Checkout Session erstellen
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card', 'twint'], // Karten + Twint
+      payment_method_types: ['card', 'twint'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `${event.headers.origin}/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${event.headers.origin}/checkout`,
+      success_url: `${origin}/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/checkout`,
       shipping_address_collection: {
         allowed_countries: ['CH', 'DE', 'AT'],
       },
       billing_address_collection: 'required',
-      // Wichtig: Bestelldetails in Session Metadata speichern
       metadata: {
-        order_source: 'webflow_custom_checkout',
-        environment: process.env.CONTEXT || 'unknown',
-        products: JSON.stringify(items.map(item => ({
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity
-        }))),
-        total_items: items.length,
-        customer_email: 'will_be_filled_by_stripe'
+        order_source: 'webflow_custom',
+        environment: isTest ? 'test' : 'production',
+        total_items: items.length.toString()
       }
     });
 
-    console.log('Stripe Session erstellt:', session.id);
+    console.log('✅ Stripe Session erstellt:', session.id);
 
     return {
       statusCode: 200,
@@ -120,17 +111,19 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         url: session.url,
         session_id: session.id,
-        environment: process.env.CONTEXT
+        environment: isTest ? 'test' : 'production'
       })
     };
 
   } catch (error) {
-    console.error('Stripe Error:', error);
+    console.error('❌ Fehler:', error.message);
+    console.error('Stack:', error.stack);
+    
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        error: 'Fehler beim Erstellen der Checkout-Session',
+        error: 'Server Fehler',
         details: error.message 
       })
     };
