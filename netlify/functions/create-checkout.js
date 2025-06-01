@@ -57,7 +57,15 @@ exports.handler = async (event, context) => {
     // Request Body parsen
     const { items } = JSON.parse(event.body || '{}');
     console.log('📦 Items empfangen:', items);
+
+    // SCHRITT 1: Versandkosten berechnen
+    const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const freeShippingThreshold = 150; // CHF 150 für gratis Versand
+    const shippingCost = subtotal >= freeShippingThreshold ? 0 : 9.90; // CHF 9.90 Versand
     
+    console.log(`📊 Subtotal: CHF ${subtotal}`);
+    console.log(`🚚 Versandkosten: CHF ${shippingCost} (Gratis ab CHF ${freeShippingThreshold})`);
+
     // Validierung
     if (!items || !Array.isArray(items) || items.length === 0) {
       console.log('❌ Keine gültigen Items');
@@ -68,7 +76,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Stripe Line Items erstellen
+    // SCHRITT 2: Stripe Line Items erstellen (Produkte + Versand)
     const lineItems = items.map(item => ({
       price_data: {
         currency: 'chf',
@@ -82,6 +90,27 @@ exports.handler = async (event, context) => {
       },
       quantity: item.quantity || 1,
     }));
+
+    // SCHRITT 3: Versandkosten als separates Line Item hinzufügen (falls > 0)
+    if (shippingCost > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'chf',
+          product_data: {
+            name: `Versandkosten (Gratis ab CHF ${freeShippingThreshold})`,
+            metadata: {
+              type: 'shipping',
+              free_shipping_threshold: freeShippingThreshold.toString()
+            }
+          },
+          unit_amount: Math.round(shippingCost * 100), // In Rappen
+        },
+        quantity: 1,
+      });
+      console.log(`📦 Versandkosten hinzugefügt: CHF ${shippingCost}`);
+    } else {
+      console.log(`🆓 GRATIS VERSAND! (Bestellung über CHF ${freeShippingThreshold})`);
+    }
 
     console.log('💳 Line Items erstellt:', lineItems.length);
 
@@ -103,7 +132,11 @@ exports.handler = async (event, context) => {
       metadata: {
         order_source: 'webflow_custom',
         environment: isTest ? 'test' : 'production',
-        total_items: items.length.toString()
+        total_items: items.length.toString(),
+        subtotal: subtotal.toFixed(2),
+        shipping_cost: shippingCost.toFixed(2),
+        free_shipping_applied: shippingCost === 0 ? 'yes' : 'no',
+        free_shipping_threshold: freeShippingThreshold.toString()
       }
     });
 
