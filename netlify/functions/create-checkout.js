@@ -114,17 +114,22 @@ exports.handler = async (event, context) => {
 
     console.log('💳 Line Items erstellt:', lineItems.length);
 
-    // Stripe Checkout Session erstellen - TWINT ohne Apple Pay testen
+    // Stripe Checkout Session erstellen - Intelligente URL Weiterleitung
     const session = await stripe.checkout.sessions.create({
       payment_method_types: [
         'card',           // Kreditkarten ✅
         'paypal',         // PayPal ✅ 
-        'twint'           // TWINT (Test ohne Apple Pay)
+        'twint'           // TWINT ✅
       ],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `${origin}/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/checkout`,
+      // INTELLIGENTE SUCCESS/CANCEL URLs basierend auf Origin
+      success_url: isTest 
+        ? `https://aesthetikoase.webflow.io/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}`
+        : `https://aesthetikoase.ch/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: isTest 
+        ? `https://aesthetikoase.webflow.io/checkout`
+        : `https://aesthetikoase.ch/checkout`,
       shipping_address_collection: {
         allowed_countries: ['CH', 'DE', 'AT'],
       },
@@ -132,6 +137,7 @@ exports.handler = async (event, context) => {
       metadata: {
         order_source: 'webflow_custom',
         environment: isTest ? 'test' : 'production',
+        origin_domain: origin,
         total_items: items.length.toString(),
         subtotal: subtotal.toFixed(2),
         shipping_cost: shippingCost.toFixed(2),
