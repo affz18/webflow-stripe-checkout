@@ -60,9 +60,9 @@ exports.handler = async (event, context) => {
 
     // 🆕 BESTELLNUMMER GENERIEREN
     const generateOrderNumber = () => {
-      const timestamp = Date.now().toString().slice(-6); // Letzten 6 Ziffern
-      const random = Math.random().toString(36).substr(2, 4).toUpperCase(); // 4 zufällige Zeichen
-      return `AK-${timestamp}-${random}`; // z.B. AK-123456-A7B9
+      const timestamp = Date.now().toString().slice(-6);
+      const random = Math.random().toString(36).substr(2, 4).toUpperCase();
+      return `AK-${timestamp}-${random}`;
     };
     
     const orderNumber = generateOrderNumber();
@@ -93,8 +93,7 @@ exports.handler = async (event, context) => {
         product_data: {
           name: item.name || 'Unbekanntes Produkt',
           metadata: {
-            source: 'webflow_checkout',
-            order_number: orderNumber // 🆕 Bestellnummer zu jedem Produkt
+            source: 'webflow_checkout'
           }
         },
         unit_amount: Math.round((item.price || 0) * 100), // In Rappen
@@ -111,8 +110,7 @@ exports.handler = async (event, context) => {
             name: `Versandkosten (Gratis ab CHF ${freeShippingThreshold})`,
             metadata: {
               type: 'shipping',
-              free_shipping_threshold: freeShippingThreshold.toString(),
-              order_number: orderNumber // 🆕 Auch hier die Bestellnummer
+              free_shipping_threshold: freeShippingThreshold.toString()
             }
           },
           unit_amount: Math.round(shippingCost * 100), // In Rappen
@@ -135,7 +133,7 @@ exports.handler = async (event, context) => {
       ],
       line_items: lineItems,
       mode: 'payment',
-      // 🆕 BESTELLNUMMER als client_reference_id setzen
+      // 🆕 NUR die wichtigsten Bestellnummer-Felder
       client_reference_id: orderNumber,
       // INTELLIGENTE SUCCESS/CANCEL URLs basierend auf Origin
       success_url: isTest 
@@ -149,15 +147,9 @@ exports.handler = async (event, context) => {
       },
       billing_address_collection: 'required',
       metadata: {
-        order_number: orderNumber, // 🆕 Hauptbestellnummer in Metadata
+        order_number: orderNumber, // 🆕 Einfache Bestellnummer
         order_source: 'webflow_custom',
-        environment: isTest ? 'test' : 'production',
-        origin_domain: origin,
-        total_items: items.length.toString(),
-        subtotal: subtotal.toFixed(2),
-        shipping_cost: shippingCost.toFixed(2),
-        free_shipping_applied: shippingCost === 0 ? 'yes' : 'no',
-        free_shipping_threshold: freeShippingThreshold.toString()
+        environment: isTest ? 'test' : 'production'
       }
     });
 
@@ -170,7 +162,7 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         url: session.url,
         session_id: session.id,
-        order_number: orderNumber, // 🆕 Bestellnummer zurückgeben
+        order_number: orderNumber,
         environment: isTest ? 'test' : 'production'
       })
     };
