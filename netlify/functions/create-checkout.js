@@ -101,15 +101,10 @@ exports.handler = async (event, context) => {
       cancel_url: isTest 
         ? `https://aesthetikoase.webflow.io/checkout`
         : `https://xn--sthetikoase-k8a.ch/checkout`,
-      billing_address_collection: 'required',
       shipping_address_collection: {
         allowed_countries: ['CH', 'DE', 'AT']
       },
-      custom_text: {
-        shipping_address: {
-          message: 'Bitte geben Sie Ihre Lieferadresse ein:'
-        }
-      },
+      billing_address_collection: 'required',
       metadata: {
         order_number: orderNumber
       }
