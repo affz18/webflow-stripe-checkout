@@ -137,14 +137,6 @@ exports.handler = async (event, context) => {
       mode: 'payment',
       // 🆕 BESTELLNUMMER als client_reference_id setzen
       client_reference_id: orderNumber,
-      // 🆕 BESTELLNUMMER auch als Receipt Number
-      payment_intent_data: {
-        receipt_email: null, // Wird von Stripe automatisch gesetzt
-        metadata: {
-          order_number: orderNumber,
-          receipt_number: orderNumber // Zusätzlich als Receipt Number
-        }
-      },
       // INTELLIGENTE SUCCESS/CANCEL URLs basierend auf Origin
       success_url: isTest 
         ? `https://aesthetikoase.webflow.io/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}&order=${orderNumber}`
