@@ -140,10 +140,10 @@ exports.handler = async (event, context) => {
       // INTELLIGENTE SUCCESS/CANCEL URLs basierend auf Origin
       success_url: isTest 
         ? `https://aesthetikoase.webflow.io/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}&order=${orderNumber}`
-        : `https://aesthetikoase.ch/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}&order=${orderNumber}`,
+        : `https://ästhetikoase.ch/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}&order=${orderNumber}`,
       cancel_url: isTest 
         ? `https://aesthetikoase.webflow.io/checkout`
-        : `https://aesthetikoase.ch/checkout`,
+        : `https://ästhetikoase.ch/checkout`,
       shipping_address_collection: {
         allowed_countries: ['CH', 'DE', 'AT'],
       },
