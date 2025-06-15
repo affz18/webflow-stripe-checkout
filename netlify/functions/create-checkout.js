@@ -56,8 +56,13 @@ exports.handler = async (event, context) => {
     const { items } = JSON.parse(event.body || '{}');
     console.log('📦 Items empfangen:', items);
 
-    // Bestellnummer generieren
-    const orderNumber = `AK-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    // Bestellnummer generieren - Datum Format
+    const now = new Date();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const year = now.getFullYear();
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const orderNumber = `AK-${month}${day}${year}-${random}`;
     console.log('🔢 Bestellnummer generiert:', orderNumber);
 
     // Versandkosten berechnen
