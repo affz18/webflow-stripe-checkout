@@ -58,6 +58,16 @@ exports.handler = async (event, context) => {
     const { items } = JSON.parse(event.body || '{}');
     console.log('📦 Items empfangen:', items);
 
+    // 🆕 BESTELLNUMMER GENERIEREN
+    const generateOrderNumber = () => {
+      const timestamp = Date.now().toString().slice(-6); // Letzten 6 Ziffern
+      const random = Math.random().toString(36).substr(2, 4).toUpperCase(); // 4 zufällige Zeichen
+      return `AK-${timestamp}-${random}`; // z.B. AK-123456-A7B9
+    };
+    
+    const orderNumber = generateOrderNumber();
+    console.log('🔢 Bestellnummer generiert:', orderNumber);
+
     // SCHRITT 1: Versandkosten berechnen
     const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const freeShippingThreshold = 150; // CHF 150 für gratis Versand
@@ -83,7 +93,8 @@ exports.handler = async (event, context) => {
         product_data: {
           name: item.name || 'Unbekanntes Produkt',
           metadata: {
-            source: 'webflow_checkout'
+            source: 'webflow_checkout',
+            order_number: orderNumber // 🆕 Bestellnummer zu jedem Produkt
           }
         },
         unit_amount: Math.round((item.price || 0) * 100), // In Rappen
@@ -100,7 +111,8 @@ exports.handler = async (event, context) => {
             name: `Versandkosten (Gratis ab CHF ${freeShippingThreshold})`,
             metadata: {
               type: 'shipping',
-              free_shipping_threshold: freeShippingThreshold.toString()
+              free_shipping_threshold: freeShippingThreshold.toString(),
+              order_number: orderNumber // 🆕 Auch hier die Bestellnummer
             }
           },
           unit_amount: Math.round(shippingCost * 100), // In Rappen
@@ -123,10 +135,12 @@ exports.handler = async (event, context) => {
       ],
       line_items: lineItems,
       mode: 'payment',
+      // 🆕 BESTELLNUMMER als client_reference_id setzen
+      client_reference_id: orderNumber,
       // INTELLIGENTE SUCCESS/CANCEL URLs basierend auf Origin
       success_url: isTest 
-        ? `https://aesthetikoase.webflow.io/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}`
-        : `https://aesthetikoase.ch/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}`,
+        ? `https://aesthetikoase.webflow.io/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}&order=${orderNumber}`
+        : `https://aesthetikoase.ch/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}&order=${orderNumber}`,
       cancel_url: isTest 
         ? `https://aesthetikoase.webflow.io/checkout`
         : `https://aesthetikoase.ch/checkout`,
@@ -135,6 +149,7 @@ exports.handler = async (event, context) => {
       },
       billing_address_collection: 'required',
       metadata: {
+        order_number: orderNumber, // 🆕 Hauptbestellnummer in Metadata
         order_source: 'webflow_custom',
         environment: isTest ? 'test' : 'production',
         origin_domain: origin,
@@ -147,6 +162,7 @@ exports.handler = async (event, context) => {
     });
 
     console.log('✅ Stripe Session erstellt:', session.id);
+    console.log('🔢 Mit Bestellnummer:', orderNumber);
 
     return {
       statusCode: 200,
@@ -154,6 +170,7 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({
         url: session.url,
         session_id: session.id,
+        order_number: orderNumber, // 🆕 Bestellnummer zurückgeben
         environment: isTest ? 'test' : 'production'
       })
     };
