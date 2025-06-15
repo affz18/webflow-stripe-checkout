@@ -133,6 +133,22 @@ exports.handler = async (event, context) => {
       ],
       line_items: lineItems,
       mode: 'payment',
+    // Stripe Checkout Session erstellen - Intelligente URL Weiterleitung
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: [
+        'card',           // Kreditkarten ✅
+        'paypal',         // PayPal ✅ 
+        'twint'           // TWINT ✅
+      ],
+      line_items: lineItems,
+      mode: 'payment',
+      // 🆕 Bestellnummer in Payment Intent Description
+      payment_intent_data: {
+        description: `Bestellung ${orderNumber}`, // Sichtbar in Zahlungsübersicht!
+        metadata: {
+          order_number: orderNumber
+        }
+      },
       // 🆕 NUR die wichtigsten Bestellnummer-Felder
       client_reference_id: orderNumber,
       // INTELLIGENTE SUCCESS/CANCEL URLs basierend auf Origin
