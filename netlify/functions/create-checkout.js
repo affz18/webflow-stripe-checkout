@@ -71,7 +71,7 @@ exports.handler = async (event, context) => {
     // SCHRITT 1: Versandkosten berechnen
     const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const freeShippingThreshold = 150; // CHF 150 für gratis Versand
-    const shippingCost = subtotal >= freeShippingThreshold ? 0 : 0.10; // CHF 0.10 Versand (TEST)
+    const shippingCost = subtotal >= freeShippingThreshold ? 0 : 0.40; // CHF 0.40 Versand (TEST)
     
     console.log(`📊 Subtotal: CHF ${subtotal}`);
     console.log(`🚚 Versandkosten: CHF ${shippingCost} (Gratis ab CHF ${freeShippingThreshold})`);
