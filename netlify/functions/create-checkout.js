@@ -52,7 +52,7 @@ exports.handler = async (event, context) => {
 
     // Versandkosten berechnen
     const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const shippingCost = 0; // CHF 0.00 Versand (GRATIS VERSAND AKTION)
+    const shippingCost = 0.50; // CHF 0.50 Versand (MINIMAL für Stripe-Limit)
 
     // Validierung
     if (!items || !Array.isArray(items) || items.length === 0) {
