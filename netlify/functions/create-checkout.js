@@ -52,7 +52,7 @@ exports.handler = async (event, context) => {
 
     // Versandkosten berechnen
     const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const shippingCost = subtotal >= 150 ? 0 : 9.90; // CHF 9.90 Versand (LIVE)
+    const shippingCost = 0; // CHF 0.00 Versand (GRATIS VERSAND AKTION)
 
     // Validierung
     if (!items || !Array.isArray(items) || items.length === 0) {
