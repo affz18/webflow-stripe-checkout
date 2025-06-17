@@ -6,7 +6,7 @@ exports.handler = async (event, context) => {
     'Access-Control-Allow-Methods': '*',
     'Access-Control-Max-Age': '86400'
   };
-
+  
   // OPTIONS Request für CORS Preflight
   if (event.httpMethod === 'OPTIONS') {
     return {
@@ -15,7 +15,7 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ message: 'CORS OK' })
     };
   }
-
+  
   // Nur POST erlauben
   if (event.httpMethod !== 'POST') {
     return {
@@ -24,7 +24,7 @@ exports.handler = async (event, context) => {
       body: JSON.stringify({ error: 'Nur POST erlaubt' })
     };
   }
-
+  
   try {
     // Stripe Key auswählen basierend auf Origin
     const origin = event.headers.origin || event.headers.referer || '';
@@ -35,13 +35,17 @@ exports.handler = async (event, context) => {
     if (!stripeKey) {
       throw new Error('Stripe Key nicht gefunden');
     }
-
+    
     // Stripe initialisieren
     const stripe = require('stripe')(stripeKey);
-
-    // Request Body parsen
-    const { items } = JSON.parse(event.body || '{}');
-
+    
+    // Request Body parsen - ERWEITERT für shipping
+    const { items, shipping } = JSON.parse(event.body || '{}');
+    
+    console.log('📦 Erhaltene Daten:');
+    console.log('   Produkte:', items);
+    console.log('   Versandkosten:', shipping);
+    
     // Bestellnummer generieren - Datum Format
     const now = new Date();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
@@ -49,11 +53,7 @@ exports.handler = async (event, context) => {
     const year = now.getFullYear();
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     const orderNumber = `AK-${month}${day}${year}-${random}`;
-
-    // Versandkosten berechnen
-    const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const shippingCost = 0.50; // CHF 0.50 Versand (MINIMAL für Stripe-Limit)
-
+    
     // Validierung
     if (!items || !Array.isArray(items) || items.length === 0) {
       return {
@@ -62,34 +62,68 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({ error: 'Keine Artikel im Warenkorb' })
       };
     }
-
-    // Line Items erstellen
+    
+    // Line Items erstellen - NUR ECHTE PRODUKTE
     const lineItems = items.map(item => ({
       price_data: {
         currency: 'chf',
         product_data: {
-          name: item.name || 'Unbekanntes Produkt'
+          name: item.name || 'Unbekanntes Produkt',
+          metadata: { 
+            type: 'product' // Markierung für Zapier: nur echte Produkte
+          }
         },
         unit_amount: Math.round((item.price || 0) * 100)
       },
       quantity: item.quantity || 1
     }));
-
-    // Versandkosten hinzufügen
-    if (shippingCost > 0) {
+    
+    console.log(`📦 ${lineItems.length} Produkte erstellt`);
+    
+    // Versandkosten hinzufügen falls vom Frontend gesendet
+    if (shipping && shipping.amount > 0) {
       lineItems.push({
         price_data: {
           currency: 'chf',
           product_data: {
-            name: 'Versandkosten'
+            name: shipping.description || 'Versandkosten',
+            metadata: { 
+              type: 'shipping' // Markierung für Zapier: Versandkosten ausfiltern
+            }
           },
-          unit_amount: Math.round(shippingCost * 100)
+          unit_amount: shipping.amount // Bereits in Rappen vom Frontend
         },
         quantity: 1
       });
+      
+      console.log(`🚛 Versandkosten hinzugefügt: ${shipping.description} - ${shipping.amount/100} CHF`);
+    } else {
+      // Fallback: Minimale Versandkosten falls nichts vom Frontend kommt
+      const fallbackShipping = 0.50; // CHF 0.50 MINIMAL für Stripe-Limit
+      lineItems.push({
+        price_data: {
+          currency: 'chf',
+          product_data: {
+            name: 'Versandkosten',
+            metadata: { 
+              type: 'shipping' // Markierung für Zapier: ausfiltern
+            }
+          },
+          unit_amount: Math.round(fallbackShipping * 100)
+        },
+        quantity: 1
+      });
+      
+      console.log(`🚛 Fallback Versandkosten hinzugefügt: CHF ${fallbackShipping}`);
     }
-
-    // Stripe Checkout Session erstellen - MINIMAL für Geschwindigkeit
+    
+    // Gesamtsumme für Logging
+    const totalAmount = lineItems.reduce((sum, item) => 
+      sum + (item.price_data.unit_amount * item.quantity), 0
+    );
+    console.log(`💰 Gesamtsumme: CHF ${totalAmount/100}`);
+    
+    // Stripe Checkout Session erstellen
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'paypal', 'twint'],
       line_items: lineItems,
@@ -111,10 +145,14 @@ exports.handler = async (event, context) => {
         }
       },
       metadata: {
-        order_number: orderNumber
+        order_number: orderNumber,
+        product_count: items.length,
+        has_shipping: shipping ? 'yes' : 'no'
       }
     });
-
+    
+    console.log(`✅ Stripe Session erstellt: ${session.id}`);
+    
     return {
       statusCode: 200,
       headers,
@@ -124,8 +162,9 @@ exports.handler = async (event, context) => {
         order_number: orderNumber
       })
     };
-
+    
   } catch (error) {
+    console.error('❌ Stripe Fehler:', error);
     return {
       statusCode: 500,
       headers,
