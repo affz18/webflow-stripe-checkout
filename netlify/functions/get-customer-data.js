@@ -1,30 +1,72 @@
-<!-- Einfache Version für Webflow - NUR Bestellnummer -->
+// Neue Datei: netlify/functions/get-customer-data.js
 
-<!-- HTML in Webflow -->
-<div class="order-confirmation">
-  <h1>Herzlichen Dank für Ihre Bestellung!</h1>
-  <p>Ihre Bestellnummer lautet: <strong id="order-number">Wird geladen...</strong></p>
-  <p>Sie erhalten in Kürze eine Bestätigungs-E-Mail mit allen Details.</p>
-</div>
+exports.handler = async (event, context) => {
+  // CORS Headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': '*',
+    'Access-Control-Allow-Methods': '*'
+  };
 
-<!-- JavaScript - NUR URL Parameter, KEIN API Call -->
-<script>
-(function() {
-  // URL Parameter auslesen
-  const urlParams = new URLSearchParams(window.location.search);
-  const orderNumber = urlParams.get('order');
-  
-  // Bestellnummer sofort anzeigen
-  if (orderNumber) {
-    const orderElement = document.getElementById('order-number');
-    if (orderElement) {
-      orderElement.textContent = orderNumber;
-    }
-  } else {
-    const orderElement = document.getElementById('order-number');
-    if (orderElement) {
-      orderElement.textContent = 'Nicht verfügbar';
-    }
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' };
   }
-})();
-</script>
+
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ error: 'Nur POST erlaubt' })
+    };
+  }
+
+  try {
+    const { session_id } = JSON.parse(event.body);
+    
+    if (!session_id) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Session ID fehlt' })
+      };
+    }
+
+    // Stripe initialisieren
+    const origin = event.headers.origin || event.headers.referer || '';
+    const isTest = origin.includes('.webflow.io');
+    const stripeKey = isTest ? process.env.STRIPE_SECRET_KEY : process.env.STRIPE_Prod;
+    
+    if (!stripeKey) {
+      throw new Error('Stripe Key nicht gefunden');
+    }
+
+    const stripe = require('stripe')(stripeKey);
+
+    // Checkout Session abrufen
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+    
+    // Antwort mit Kundendaten
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        customer_details: session.customer_details,
+        client_reference_id: session.client_reference_id,
+        amount_total: session.amount_total,
+        currency: session.currency
+      })
+    };
+
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Kundendaten:', error);
+    
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Fehler beim Laden der Kundendaten',
+        details: error.message 
+      })
+    };
+  }
+};
