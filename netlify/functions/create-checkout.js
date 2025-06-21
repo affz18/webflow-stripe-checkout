@@ -123,22 +123,31 @@ exports.handler = async (event, context) => {
     );
     console.log(`💰 Gesamtsumme: CHF ${totalAmount/100}`);
     
-    // Stripe Checkout Session erstellen
+    // Stripe Checkout Session erstellen - MIT TWINT-OPTIMIERUNGEN
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'paypal', 'twint'],
       line_items: lineItems,
       mode: 'payment',
       client_reference_id: orderNumber,
+      // INTELLIGENTE URLs basierend auf Test/Live
       success_url: isTest 
         ? `https://aesthetikoase.webflow.io/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}&order=${orderNumber}`
         : `https://xn--sthetikoase-k8a.ch/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}&order=${orderNumber}`,
       cancel_url: isTest 
-        ? `https://aesthetikoase.webflow.io/checkout`
-        : `https://xn--sthetikoase-k8a.ch/checkout`,
+        ? `https://aesthetikoase.webflow.io/checkout?cancelled=true&reason=user_cancel`
+        : `https://xn--sthetikoase-k8a.ch/checkout?cancelled=true&reason=user_cancel`,
       billing_address_collection: 'required',
       shipping_address_collection: {
         allowed_countries: ['CH', 'DE', 'AT']
       },
+      // TWINT-OPTIMIERUNGEN
+      payment_method_options: {
+        twint: {
+          confirmation_method: 'automatic' // Schnellere TWINT-Bestätigung
+        }
+      },
+      // Kürzere Session-Dauer für TWINT-Probleme
+      expires_at: Math.floor(Date.now() / 1000) + (30 * 60), // 30 Minuten statt Standard
       custom_text: {
         shipping_address: {
           message: 'Bitte geben Sie Ihre Lieferadresse ein:'
@@ -147,7 +156,9 @@ exports.handler = async (event, context) => {
       metadata: {
         order_number: orderNumber,
         product_count: items.length,
-        has_shipping: shipping ? 'yes' : 'no'
+        has_shipping: shipping ? 'yes' : 'no',
+        environment: isTest ? 'test' : 'production',
+        origin_domain: origin
       }
     });
     
