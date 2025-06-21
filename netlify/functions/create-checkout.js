@@ -37,7 +37,9 @@ exports.handler = async (event, context) => {
     }
     
     // Stripe initialisieren
-    const stripe = require('stripe')(stripeKey);
+    const body = JSON.parse(event.body || '{}');
+    const items = body.items;
+    const shipping = body.shipping || null;
     
     // Request Body parsen - ERWEITERT für shipping
     const { items, shipping } = JSON.parse(event.body || '{}');
