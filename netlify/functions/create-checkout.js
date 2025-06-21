@@ -125,7 +125,7 @@ exports.handler = async (event, context) => {
     );
     console.log(`💰 Gesamtsumme: CHF ${totalAmount/100}`);
     
-    // Stripe Checkout Session erstellen - MIT TWINT-OPTIMIERUNGEN
+    // Stripe Checkout Session erstellen - OHNE problematische TWINT-Optionen
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'paypal', 'twint'],
       line_items: lineItems,
@@ -142,14 +142,8 @@ exports.handler = async (event, context) => {
       shipping_address_collection: {
         allowed_countries: ['CH', 'DE', 'AT']
       },
-      // TWINT-OPTIMIERUNGEN
-      payment_method_options: {
-        twint: {
-          confirmation_method: 'automatic' // Schnellere TWINT-Bestätigung
-        }
-      },
-      // Kürzere Session-Dauer für TWINT-Probleme
-      expires_at: Math.floor(Date.now() / 1000) + (30 * 60), // 30 Minuten statt Standard
+      // Kürzere Session-Dauer (das funktioniert)
+      expires_at: Math.floor(Date.now() / 1000) + (30 * 60), // 30 Minuten
       custom_text: {
         shipping_address: {
           message: 'Bitte geben Sie Ihre Lieferadresse ein:'
