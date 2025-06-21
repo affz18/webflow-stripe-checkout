@@ -37,16 +37,16 @@ exports.handler = async (event, context) => {
     }
     
     // Stripe initialisieren
-    const body = JSON.parse(event.body || '{}');
-    const items = body.items;
-    const shipping = body.shipping || null;
+    const stripe = require('stripe')(stripeKey);
     
-    // Request Body parsen - ERWEITERT für shipping
-    const { items, shipping } = JSON.parse(event.body || '{}');
+    // Request Body parsen - KORRIGIERTE Version ohne Doppeldeklaration
+    const requestBody = JSON.parse(event.body || '{}');
+    const requestItems = requestBody.items;
+    const requestShipping = requestBody.shipping || null;
     
     console.log('📦 Erhaltene Daten:');
-    console.log('   Produkte:', items);
-    console.log('   Versandkosten:', shipping);
+    console.log('   Produkte:', requestItems);
+    console.log('   Versandkosten:', requestShipping);
     
     // Bestellnummer generieren - Datum Format
     const now = new Date();
@@ -57,7 +57,7 @@ exports.handler = async (event, context) => {
     const orderNumber = `AK-${month}${day}${year}-${random}`;
     
     // Validierung
-    if (!items || !Array.isArray(items) || items.length === 0) {
+    if (!requestItems || !Array.isArray(requestItems) || requestItems.length === 0) {
       return {
         statusCode: 400,
         headers,
@@ -66,7 +66,7 @@ exports.handler = async (event, context) => {
     }
     
     // Line Items erstellen - NUR ECHTE PRODUKTE
-    const lineItems = items.map(item => ({
+    const lineItems = requestItems.map(item => ({
       price_data: {
         currency: 'chf',
         product_data: {
@@ -83,22 +83,22 @@ exports.handler = async (event, context) => {
     console.log(`📦 ${lineItems.length} Produkte erstellt`);
     
     // Versandkosten hinzufügen falls vom Frontend gesendet
-    if (shipping && shipping.amount > 0) {
+    if (requestShipping && requestShipping.amount > 0) {
       lineItems.push({
         price_data: {
           currency: 'chf',
           product_data: {
-            name: shipping.description || 'Versandkosten',
+            name: requestShipping.description || 'Versandkosten',
             metadata: { 
               type: 'shipping' // Markierung für Zapier: Versandkosten ausfiltern
             }
           },
-          unit_amount: shipping.amount // Bereits in Rappen vom Frontend
+          unit_amount: requestShipping.amount // Bereits in Rappen vom Frontend
         },
         quantity: 1
       });
       
-      console.log(`🚛 Versandkosten hinzugefügt: ${shipping.description} - ${shipping.amount/100} CHF`);
+      console.log(`🚛 Versandkosten hinzugefügt: ${requestShipping.description} - ${requestShipping.amount/100} CHF`);
     } else {
       // Fallback: Minimale Versandkosten falls nichts vom Frontend kommt
       const fallbackShipping = 0.50; // CHF 0.50 MINIMAL für Stripe-Limit
@@ -157,8 +157,8 @@ exports.handler = async (event, context) => {
       },
       metadata: {
         order_number: orderNumber,
-        product_count: items.length,
-        has_shipping: shipping ? 'yes' : 'no',
+        product_count: requestItems.length,
+        has_shipping: requestShipping ? 'yes' : 'no',
         environment: isTest ? 'test' : 'production',
         origin_domain: origin
       }
