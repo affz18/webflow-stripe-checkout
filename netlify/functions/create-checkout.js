@@ -125,9 +125,15 @@ exports.handler = async (event, context) => {
     );
     console.log(`💰 Gesamtsumme: CHF ${totalAmount/100}`);
     
-    // Stripe Checkout Session erstellen - OHNE problematische TWINT-Optionen
+    // Stripe Checkout Session erstellen - MIT ALLEN Payment Methods
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card', 'paypal', 'twint'],
+      payment_method_types: [
+        'card',           // Kreditkarten
+        'paypal',         // PayPal  
+        'twint',          // TWINT (Schweiz)
+        'klarna',         // Klarna (Buy now, pay later)
+        'billie'          // Billie (B2B Payment)
+      ],
       line_items: lineItems,
       mode: 'payment',
       client_reference_id: orderNumber,
