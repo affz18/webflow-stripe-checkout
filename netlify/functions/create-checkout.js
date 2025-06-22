@@ -125,12 +125,12 @@ exports.handler = async (event, context) => {
     );
     console.log(`💰 Gesamtsumme: CHF ${totalAmount/100}`);
     
-    // Stripe Checkout Session erstellen - MIT ALLEN Payment Methods
+    // Stripe Checkout Session erstellen - TWINT zuerst für Schweizer Kunden
     const session = await stripe.checkout.sessions.create({
       payment_method_types: [
+        'twint',          // TWINT zuerst (beliebteste in der Schweiz) 🇨🇭
         'card',           // Kreditkarten
         'paypal',         // PayPal  
-        'twint',          // TWINT (Schweiz)
         'klarna',         // Klarna (Buy now, pay later)
         'billie'          // Billie (B2B Payment)
       ],
