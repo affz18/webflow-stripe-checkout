@@ -100,23 +100,34 @@ exports.handler = async (event, context) => {
       
       console.log(`🚛 Versandkosten hinzugefügt: ${requestShipping.description} - ${requestShipping.amount/100} CHF`);
     } else {
-      // Fallback: Normale Versandkosten falls nichts vom Frontend kommt
-      const fallbackShipping = 9.90; // CHF 9.90 STANDARD Versandkosten
-      lineItems.push({
-        price_data: {
-          currency: 'chf',
-          product_data: {
-            name: 'Versandkosten (Gratis ab CHF 150)',
-            metadata: { 
-              type: 'shipping' // Markierung für Zapier: ausfiltern
-            }
-          },
-          unit_amount: Math.round(fallbackShipping * 100)
-        },
-        quantity: 1
-      });
+      // INTELLIGENTE Versandkostenberechnung falls Frontend keine sendet
+      const productTotal = requestItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const freeShippingThreshold = 150;
+      const shippingCost = productTotal >= freeShippingThreshold ? 0 : 9.90;
       
-      console.log(`🚛 Fallback Versandkosten hinzugefügt: CHF ${fallbackShipping}`);
+      console.log(`📊 Produktsumme: CHF ${productTotal}`);
+      console.log(`🚚 Versandkosten: CHF ${shippingCost} (Gratis ab CHF ${freeShippingThreshold})`);
+      
+      // Nur Versandkosten hinzufügen wenn > 0
+      if (shippingCost > 0) {
+        lineItems.push({
+          price_data: {
+            currency: 'chf',
+            product_data: {
+              name: 'Versandkosten (Gratis ab CHF 150)',
+              metadata: { 
+                type: 'shipping'
+              }
+            },
+            unit_amount: Math.round(shippingCost * 100)
+          },
+          quantity: 1
+        });
+        
+        console.log(`🚛 Versandkosten hinzugefügt: CHF ${shippingCost}`);
+      } else {
+        console.log(`🆓 GRATIS VERSAND! (Bestellung über CHF ${freeShippingThreshold})`);
+      }
     }
     
     // Gesamtsumme für Logging
