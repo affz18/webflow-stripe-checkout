@@ -100,13 +100,13 @@ exports.handler = async (event, context) => {
       
       console.log(`🚛 Versandkosten hinzugefügt: ${requestShipping.description} - ${requestShipping.amount/100} CHF`);
     } else {
-      // Fallback: Minimale Versandkosten falls nichts vom Frontend kommt
-      const fallbackShipping = 0.50; // CHF 0.50 MINIMAL für Stripe-Limit
+      // Fallback: Normale Versandkosten falls nichts vom Frontend kommt
+      const fallbackShipping = 9.90; // CHF 9.90 STANDARD Versandkosten
       lineItems.push({
         price_data: {
           currency: 'chf',
           product_data: {
-            name: 'Versandkosten',
+            name: 'Versandkosten (Gratis ab CHF 150)',
             metadata: { 
               type: 'shipping' // Markierung für Zapier: ausfiltern
             }
