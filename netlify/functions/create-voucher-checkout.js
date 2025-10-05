@@ -120,8 +120,8 @@ exports.handler = async (event, context) => {
       
       // Success & Cancel URLs
       success_url: isTest 
-        ? `https://aesthetikoase.webflow.io/gutschein-bestaetigung?session_id={CHECKOUT_SESSION_ID}&voucher=${voucherCode}`
-        : `https://xn--sthetikoase-k8a.ch/gutschein-bestaetigung?session_id={CHECKOUT_SESSION_ID}&voucher=${voucherCode}`,
+        ? `https://aesthetikoase.webflow.io/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}&voucher=${voucherCode}`
+        : `https://xn--sthetikoase-k8a.ch/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}&voucher=${voucherCode}`,
       cancel_url: isTest 
         ? `https://aesthetikoase.webflow.io/gutschein?cancelled=true`
         : `https://xn--sthetikoase-k8a.ch/gutschein?cancelled=true`,
