@@ -1,6 +1,5 @@
 // create-voucher-checkout.js
 exports.handler = async (event, context) => {
-  // CORS Headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': '*',
@@ -8,7 +7,6 @@ exports.handler = async (event, context) => {
     'Access-Control-Max-Age': '86400'
   };
   
-  // OPTIONS Request für CORS Preflight
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
@@ -17,7 +15,6 @@ exports.handler = async (event, context) => {
     };
   }
   
-  // Nur POST erlauben
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -27,7 +24,6 @@ exports.handler = async (event, context) => {
   }
   
   try {
-    // Stripe Key auswählen basierend auf Origin
     const origin = event.headers.origin || event.headers.referer || '';
     const isTest = origin.includes('.webflow.io');
     
@@ -37,19 +33,17 @@ exports.handler = async (event, context) => {
       throw new Error('Stripe Key nicht gefunden');
     }
     
-    // Stripe initialisieren
     const stripe = require('stripe')(stripeKey);
-    
-    // Request Body parsen
     const voucherData = JSON.parse(event.body || '{}');
     
     console.log('📦 Gutschein-Bestellung erhalten:');
     console.log('   Service:', voucherData.serviceName);
     console.log('   Preis:', voucherData.price);
-    console.log('   Empfänger:', voucherData.recipient.name);
+    console.log('   Versandart:', voucherData.deliveryType);
+    console.log('   Versandkosten:', voucherData.deliveryCost);
     
     // Validierung
-    if (!voucherData.service || !voucherData.price || !voucherData.recipient) {
+    if (!voucherData.service || !voucherData.price || !voucherData.buyerEmail) {
       return {
         statusCode: 400,
         headers,
@@ -57,8 +51,16 @@ exports.handler = async (event, context) => {
       };
     }
     
+    // Bei physischem Gutschein muss Empfängeradresse vorhanden sein
+    if (voucherData.deliveryType === 'physical' && !voucherData.recipient) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Empfängeradresse fehlt für physischen Gutschein' })
+      };
+    }
+    
     // GUTSCHEIN-CODE GENERIEREN
-    // Format: GS-MMDDYYYY-XXXX (GS = GeschenkSchenk, dann Datum, dann 4-stelliger Zufallscode)
     const now = new Date();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const day = now.getDate().toString().padStart(2, '0');
@@ -68,46 +70,47 @@ exports.handler = async (event, context) => {
     
     console.log(`🎫 Gutschein-Code generiert: ${voucherCode}`);
     
-    // Stripe Line Item erstellen
+    // Stripe Line Items erstellen
     const lineItems = [{
       price_data: {
         currency: 'chf',
         product_data: {
           name: `🎁 Geschenkgutschein: ${voucherData.serviceName}`,
-          description: `Gutschein-Code: ${voucherCode} | Empfänger: ${voucherData.recipient.name}`,
+          description: `Gutschein-Code: ${voucherCode}${voucherData.deliveryType === 'physical' ? ' | Empfänger: ' + voucherData.recipient.name : ' | Digitaler Versand'}`,
           metadata: {
             type: 'voucher',
             voucher_code: voucherCode,
             service: voucherData.service,
-            recipient_name: voucherData.recipient.name
+            delivery_type: voucherData.deliveryType
           }
         },
-        unit_amount: Math.round(voucherData.price * 100) // CHF zu Rappen
+        unit_amount: Math.round(voucherData.price * 100)
       },
       quantity: 1
     }];
     
-    // Versandkosten für physische Geschenkbox (optional anpassen)
-    const shippingCost = 9.9;
-    lineItems.push({
-      price_data: {
-        currency: 'chf',
-        product_data: {
-          name: '📦 Geschenkbox Versand',
-          metadata: { 
-            type: 'shipping'
-          }
+    // Versandkosten NUR bei physischem Gutschein hinzufügen
+    if (voucherData.deliveryType === 'physical' && voucherData.deliveryCost > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'chf',
+          product_data: {
+            name: '📦 Geschenkverpackung & Versand',
+            metadata: { 
+              type: 'shipping'
+            }
+          },
+          unit_amount: Math.round(voucherData.deliveryCost * 100)
         },
-        unit_amount: Math.round(shippingCost * 100)
-      },
-      quantity: 1
-    });
+        quantity: 1
+      });
+    }
     
-    const totalAmount = voucherData.price + shippingCost;
+    const totalAmount = voucherData.totalPrice || (voucherData.price + (voucherData.deliveryCost || 0));
     console.log(`💰 Gesamtbetrag: CHF ${totalAmount}`);
     
-    // Stripe Checkout Session erstellen
-    const session = await stripe.checkout.sessions.create({
+    // Checkout Session Configuration
+    const sessionConfig = {
       payment_method_types: [
         'twint',
         'card',
@@ -118,7 +121,6 @@ exports.handler = async (event, context) => {
       mode: 'payment',
       client_reference_id: voucherCode,
       
-      // Success & Cancel URLs
       success_url: isTest 
         ? `https://aesthetikoase.webflow.io/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}&voucher=${voucherCode}`
         : `https://xn--sthetikoase-k8a.ch/bestellung-erfolgreich?session_id={CHECKOUT_SESSION_ID}&voucher=${voucherCode}`,
@@ -128,36 +130,44 @@ exports.handler = async (event, context) => {
       
       billing_address_collection: 'required',
       
-      // Lieferadresse = Empfängeradresse
-      shipping_address_collection: {
-        allowed_countries: ['CH', 'DE', 'AT']
-      },
-      
-      // Session läuft nach 30 Minuten ab
       expires_at: Math.floor(Date.now() / 1000) + (30 * 60),
       
-      // Metadaten für Zapier/Webhooks
       metadata: {
         type: 'voucher',
         voucher_code: voucherCode,
         service: voucherData.service,
         service_name: voucherData.serviceName,
         service_price: voucherData.price.toString(),
-        recipient_name: voucherData.recipient.name,
-        recipient_street: voucherData.recipient.street,
-        recipient_zip: voucherData.recipient.zip,
-        recipient_city: voucherData.recipient.city,
+        delivery_type: voucherData.deliveryType,
+        delivery_cost: (voucherData.deliveryCost || 0).toString(),
+        total_price: totalAmount.toString(),
         buyer_email: voucherData.buyerEmail,
         greeting_text: voucherData.greetingText || '',
         environment: isTest ? 'test' : 'production',
         created_at: new Date().toISOString()
       }
-    });
+    };
+    
+    // Lieferadresse NUR bei physischem Gutschein
+    if (voucherData.deliveryType === 'physical') {
+      sessionConfig.shipping_address_collection = {
+        allowed_countries: ['CH', 'DE', 'AT']
+      };
+      
+      // Empfängerdaten zu Metadata hinzufügen
+      sessionConfig.metadata.recipient_name = voucherData.recipient.name;
+      sessionConfig.metadata.recipient_street = voucherData.recipient.street;
+      sessionConfig.metadata.recipient_zip = voucherData.recipient.zip;
+      sessionConfig.metadata.recipient_city = voucherData.recipient.city;
+    }
+    
+    // Stripe Checkout Session erstellen
+    const session = await stripe.checkout.sessions.create(sessionConfig);
     
     console.log(`✅ Stripe Session erstellt: ${session.id}`);
     console.log(`🎫 Gutschein-Code: ${voucherCode}`);
+    console.log(`📧 Versandart: ${voucherData.deliveryType}`);
     
-    // Rückgabe
     return {
       statusCode: 200,
       headers,
