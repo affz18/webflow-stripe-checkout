@@ -88,7 +88,7 @@ exports.handler = async (event, context) => {
     }];
     
     // Versandkosten für physische Geschenkbox (optional anpassen)
-    const shippingCost = 9.90;
+    const shippingCost = 0.1;
     lineItems.push({
       price_data: {
         currency: 'chf',
